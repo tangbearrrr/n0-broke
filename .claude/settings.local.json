@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(ls:*)",
+      "Bash(npm create vite@latest client -- --template react-ts)",
+      "Bash(npx tailwindcss@3 init:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build)"
+    ]
+  }
+}
