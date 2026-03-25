@@ -1,10 +1,7 @@
 {
-  "buildCommand": "npm install --prefix client --registry https://registry.npmjs.org && npm run --prefix client build",
+  "buildCommand": "cat /vercel/.npmrc 2>/dev/null || echo 'no /vercel/.npmrc'; cat ~/.npmrc 2>/dev/null || echo 'no ~/.npmrc'; cat /vercel/path0/.npmrc 2>/dev/null || echo 'no project .npmrc'; npm config get registry",
   "outputDirectory": "client/dist",
   "installCommand": "echo ok",
-  "env": {
-    "NPM_CONFIG_REGISTRY": "https://registry.npmjs.org"
-  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
