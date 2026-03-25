@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth"
 import LoginPage from "@/pages/LoginPage"
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, error } = useAuth()
 
   if (loading) {
     return (
@@ -15,7 +15,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user) return <LoginPage />
+  if (!user) return <LoginPage error={error} />
 
   return <>{children}</>
 }

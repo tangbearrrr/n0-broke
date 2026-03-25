@@ -3,10 +3,12 @@ import { TrendingDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
 
-export default function LoginPage() {
+export default function LoginPage({ error: authError }: { error?: string | null }) {
   const { signIn } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+
+  const displayError = authError ?? error
 
   async function handleSignIn() {
     setError(null)
@@ -60,8 +62,8 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Continue with Google"}
           </Button>
 
-          {error && (
-            <p className="text-xs text-destructive text-center">{error}</p>
+          {displayError && (
+            <p className="text-xs text-destructive text-center">{displayError}</p>
           )}
         </div>
 
