@@ -1,6 +1,10 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "npm install --prefix client --registry https://registry.npmjs.org && npm run --prefix client build",
+  "outputDirectory": "client/dist",
+  "installCommand": "echo ok",
+  "env": {
+    "NPM_CONFIG_REGISTRY": "https://registry.npmjs.org"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
