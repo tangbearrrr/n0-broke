@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cat /vercel/.npmrc 2>/dev/null || echo 'no /vercel/.npmrc'; cat ~/.npmrc 2>/dev/null || echo 'no ~/.npmrc'; cat /vercel/path0/.npmrc 2>/dev/null || echo 'no project .npmrc'; npm config get registry",
+  "buildCommand": "npm install --prefix client && npm run --prefix client build",
   "outputDirectory": "client/dist",
   "installCommand": "echo ok",
   "rewrites": [
