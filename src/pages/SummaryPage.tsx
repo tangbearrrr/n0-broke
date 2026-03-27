@@ -11,14 +11,14 @@ function StatCard({
 }: { label: string; value: string; sub?: string; highlight?: "red" | "green" }) {
   return (
     <Card>
-      <CardHeader className="pb-1 pt-4 px-4">
-        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+      <CardHeader className="pb-1 pt-3 px-3 md:pt-4 md:px-4">
+        <CardTitle className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
           {label}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-4 pb-4">
+      <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
         <p className={cn(
-          "text-base md:text-2xl font-bold font-mono tabular-nums",
+          "text-xs sm:text-sm md:text-2xl font-bold font-mono tabular-nums truncate",
           highlight === "red"   && "text-rose-600 dark:text-rose-400",
           highlight === "green" && "text-emerald-600 dark:text-emerald-400",
           !highlight            && "text-foreground",
@@ -74,7 +74,51 @@ export default function SummaryPage() {
       })
   }, [transactions, afterDebts])
 
-  // ── Skeleton ───────────────────────────────────────────────────────────────
+  // ── Combined debt + transaction totals by type ────────────────────────────
+  const TYPES = ["KTC", "SHOPEE", "OTHER"] as const
+  type TypeKey = typeof TYPES[number]
+
+  const normaliseType = (raw: string): TypeKey => {
+    const u = raw.toUpperCase()
+    if (u === "KTC")    return "KTC"
+    if (u === "SHOPEE") return "SHOPEE"
+    return "OTHER"
+  }
+
+  const combinedByType = useMemo(() => {
+    const map: Record<TypeKey, { debtTotal: number; txTotal: number }> = {
+      KTC:    { debtTotal: 0, txTotal: 0 },
+      SHOPEE: { debtTotal: 0, txTotal: 0 },
+      OTHER:  { debtTotal: 0, txTotal: 0 },
+    }
+
+    // Sum debt monthly payments by type (exclude OTHER)
+    debts?.forEach((d) => {
+      const key = normaliseType(d.type || "Other")
+      if (key === "OTHER") return
+      map[key].debtTotal += Number(d.monthly_payment)
+    })
+
+    // Sum latest cycle transactions by type
+    if (cycles.length > 0) {
+      const latestCycleKey = cycles[0].key
+      transactions?.forEach((t) => {
+        const dateStr = toDateOnly(t.date)
+        const cycle   = dateStr ? dateToCycleStart(dateStr) : { year: 2000, month: 1 }
+        if (cycleKey(cycle) !== latestCycleKey) return
+        const key = normaliseType(t.type)
+        map[key].txTotal += Number(t.amount)
+      })
+    }
+
+    return TYPES.map((type) => ({
+      type,
+      ...map[type],
+      total: map[type].debtTotal + map[type].txTotal,
+    }))
+  }, [debts, transactions, cycles])
+
+
   if (isLoading) {
     return (
       <div className="p-3 md:p-6 space-y-4 md:space-y-6">
@@ -118,6 +162,63 @@ export default function SummaryPage() {
           highlight={afterDebts >= 0 ? "green" : "red"}
         />
       </div>
+
+      {/* ── Combined debt + transaction by type ────────────────────────── */}
+      {(() => {
+        const grandTotal = combinedByType.reduce((s, r) => s + r.total, 0)
+        const LABEL: Record<string, string> = { KTC: "KTC", SHOPEE: "Shopee", OTHER: "Other" }
+        return (
+          <Card>
+            <CardContent className="px-4 pt-4 pb-3">
+              {/* Header row */}
+              <div className="flex items-baseline justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Total by Type
+                </span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {formatBaht(grandTotal)}
+                </span>
+              </div>
+
+              {/* Rows */}
+              <div className="space-y-3">
+                {combinedByType.map(({ type, debtTotal, txTotal, total }) => (
+                  <div key={type}>
+                    {/* Type name + total */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">{LABEL[type]}</span>
+                      <span className="text-sm font-mono font-semibold tabular-nums">
+                        {formatBaht(total)}
+                      </span>
+                    </div>
+
+                    {/* Debt / Tx breakdown */}
+                    <div className="flex items-center gap-3">
+                      {debtTotal > 0 && type !== "OTHER" && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                          <span className="text-[11px] text-muted-foreground">Debt</span>
+                          <span className="text-[11px] font-mono tabular-nums">{formatBaht(debtTotal)}</span>
+                        </div>
+                      )}
+                      {txTotal > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                          <span className="text-[11px] text-muted-foreground">Tx</span>
+                          <span className="text-[11px] font-mono tabular-nums">{formatBaht(txTotal)}</span>
+                        </div>
+                      )}
+                      {debtTotal === 0 && txTotal === 0 && (
+                        <span className="text-[11px] text-muted-foreground/50">—</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* ── Per-cycle breakdown ────────────────────────────────────────── */}
       <div className="space-y-3">
