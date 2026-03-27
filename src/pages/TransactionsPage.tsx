@@ -37,7 +37,7 @@ type TxForm = {
   date: string
   name: string
   amount: string
-  type: "KTC" | "Shopee"
+  type: "KTC" | "Shopee" | "Other"
 }
 
 type SortKey = "date" | "name" | "amount" | "type"
@@ -124,11 +124,12 @@ export default function TransactionsPage() {
         return 0
       })
 
-      const total       = rows.reduce((s, t) => s + Number(t.amount), 0)
-      const ktcTotal    = rows.filter((t) => t.type === "KTC").reduce((s, t) => s + Number(t.amount), 0)
-      const shopeeTotal = rows.filter((t) => t.type === "Shopee").reduce((s, t) => s + Number(t.amount), 0)
+      const total        = rows.reduce((s, t) => s + Number(t.amount), 0)
+      const ktcTotal     = rows.filter((t) => t.type === "KTC").reduce((s, t) => s + Number(t.amount), 0)
+      const shopeeTotal  = rows.filter((t) => t.type === "Shopee").reduce((s, t) => s + Number(t.amount), 0)
+      const otherTotal   = rows.filter((t) => t.type === "Other").reduce((s, t) => s + Number(t.amount), 0)
 
-      return { key: cycleKey(cycle), label: cycleLabel(cycle), rows: sorted, total, ktcTotal, shopeeTotal }
+      return { key: cycleKey(cycle), label: cycleLabel(cycle), rows: sorted, total, ktcTotal, shopeeTotal, otherTotal }
     })
   }, [transactions, sortKey, sortDir])
 
@@ -164,6 +165,7 @@ export default function TransactionsPage() {
         total: number
         ktcTotal: number
         shopeeTotal: number
+        otherTotal: number
         isFirstPage: boolean
       }>
   }, [grouped, pageStart, pageEnd])
@@ -304,6 +306,9 @@ export default function TransactionsPage() {
                                   <div className="flex items-center gap-4 text-xs text-muted-foreground tabular-nums">
                                     <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />KTC {formatBaht(group.ktcTotal)}</span>
                                     <span><span className="inline-block w-2 h-2 rounded-full bg-orange-400 mr-1" />Shopee {formatBaht(group.shopeeTotal)}</span>
+                                    {group.otherTotal > 0 && (
+                                      <span><span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1" />Other {formatBaht(group.otherTotal)}</span>
+                                    )}
                                     <span className="font-semibold text-foreground">Total {formatBaht(group.total)}</span>
                                   </div>
                                 </div>
@@ -345,6 +350,9 @@ export default function TransactionsPage() {
                           <div className="flex gap-3 text-[11px] text-muted-foreground mt-0.5 tabular-nums">
                             <span><span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1" />KTC {formatBaht(group.ktcTotal)}</span>
                             <span><span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 mr-1" />Shopee {formatBaht(group.shopeeTotal)}</span>
+                            {group.otherTotal > 0 && (
+                              <span><span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1" />Other {formatBaht(group.otherTotal)}</span>
+                            )}
                             <span className="font-semibold text-foreground">Total {formatBaht(group.total)}</span>
                           </div>
                         </div>
@@ -446,7 +454,7 @@ export default function TransactionsPage() {
               <Label htmlFor="tx-type">Type</Label>
               <Select
                 value={form.type}
-                onValueChange={(v) => setForm((f) => ({ ...f, type: v as "KTC" | "Shopee" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, type: v as "KTC" | "Shopee" | "Other" }))}
               >
                 <SelectTrigger id="tx-type">
                   <SelectValue />
@@ -454,6 +462,7 @@ export default function TransactionsPage() {
                 <SelectContent>
                   <SelectItem value="KTC">KTC</SelectItem>
                   <SelectItem value="Shopee">Shopee</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

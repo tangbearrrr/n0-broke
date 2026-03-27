@@ -6,7 +6,7 @@ export interface Transaction {
   date: string | null
   name: string
   amount: number
-  type: "KTC" | "Shopee"
+  type: "KTC" | "Shopee" | "Other"
 }
 
 export interface IncomeRow {

@@ -34,7 +34,7 @@ type TxForm = {
   date: string
   name: string
   amount: string
-  type: "KTC" | "Shopee"
+  type: "KTC" | "Shopee" | "Other"
 }
 
 const EMPTY_FORM = (month: string): TxForm => ({
@@ -332,13 +332,14 @@ export default function MonthlyPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="tx-type">Payment Method</Label>
-              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v as "KTC" | "Shopee" }))}>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v as "KTC" | "Shopee" | "Other" }))}>
                 <SelectTrigger id="tx-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="KTC">KTC (Credit Card)</SelectItem>
                   <SelectItem value="Shopee">Shopee Pay</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
