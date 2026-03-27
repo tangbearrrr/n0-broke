@@ -46,8 +46,16 @@ export function cycleKey({ year, month }: CycleStart): string {
   return `${year}-${String(month).padStart(2, "0")}`
 }
 
-/** Strip time from any date string → yyyy-mm-dd */
+/** Strip time from any date string → yyyy-mm-dd, interpreted in GMT+7 (Thailand) */
 export function toDateOnly(date: string | null | undefined): string {
   if (!date) return ""
-  return date.slice(0, 10)
+  // If there is no time component (already yyyy-mm-dd), return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date
+  // Convert to GMT+7 date string using Intl (handles DST-free fixed offset)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(date))
 }
