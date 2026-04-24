@@ -53,24 +53,26 @@ export default function SummaryPage() {
       cycle: { year: number; month: number }
       ktc: number
       shopee: number
+      other: number
     }>()
 
     transactions.forEach((t) => {
       const dateStr = toDateOnly(t.date)
       const cycle   = dateStr ? dateToCycleStart(dateStr) : { year: 2000, month: 1 }
       const key     = cycleKey(cycle)
-      if (!cycleMap.has(key)) cycleMap.set(key, { cycle, ktc: 0, shopee: 0 })
+      if (!cycleMap.has(key)) cycleMap.set(key, { cycle, ktc: 0, shopee: 0, other: 0 })
       const entry = cycleMap.get(key)!
       if (t.type === "KTC")    entry.ktc    += Number(t.amount)
-      if (t.type === "Shopee") entry.shopee += Number(t.amount)
+      else if (t.type === "Shopee") entry.shopee += Number(t.amount)
+      else                          entry.other  += Number(t.amount)
     })
 
     return Array.from(cycleMap.values())
       .sort((a, b) => cycleStartToSortable(b.cycle) - cycleStartToSortable(a.cycle))
-      .map(({ cycle, ktc, shopee }) => {
-        const total    = ktc + shopee
+      .map(({ cycle, ktc, shopee, other }) => {
+        const total    = ktc + shopee + other
         const leftOver = afterDebts - total
-        return { key: cycleKey(cycle), label: cycleLabel(cycle), payMonth: cyclePayMonth(cycle), ktc, shopee, total, leftOver }
+        return { key: cycleKey(cycle), label: cycleLabel(cycle), payMonth: cyclePayMonth(cycle), ktc, shopee, other, total, leftOver }
       })
   }, [transactions, afterDebts])
 
@@ -243,7 +245,7 @@ export default function SummaryPage() {
                   </div>
 
                   {/* Breakdown grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-1 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-8 gap-y-1 text-sm">
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wider">KTC</p>
                       <p className="font-mono tabular-nums text-rose-600 dark:text-rose-400">
@@ -256,6 +258,14 @@ export default function SummaryPage() {
                         {formatBaht(c.shopee)}
                       </p>
                     </div>
+                    {c.other > 0 && (
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Other</p>
+                        <p className="font-mono tabular-nums text-amber-600 dark:text-amber-400">
+                          {formatBaht(c.other)}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Spent</p>
                       <p className="font-mono tabular-nums font-semibold">

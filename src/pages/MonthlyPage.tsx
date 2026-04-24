@@ -87,7 +87,8 @@ export default function MonthlyPage() {
   const totalDebts = debts?.reduce((s, d) => s + Number(d.monthly_payment), 0) ?? 0
   const ktcTotal = transactions?.filter((t) => t.type === "KTC").reduce((s, t) => s + Number(t.amount), 0) ?? 0
   const shopeeTotal = transactions?.filter((t) => t.type === "Shopee").reduce((s, t) => s + Number(t.amount), 0) ?? 0
-  const leftOver = Number(netIncome) - totalDebts - ktcTotal - shopeeTotal
+  const otherTotal = transactions?.filter((t) => t.type !== "KTC" && t.type !== "Shopee").reduce((s, t) => s + Number(t.amount), 0) ?? 0
+  const leftOver = Number(netIncome) - totalDebts - ktcTotal - shopeeTotal - otherTotal
 
   function openAdd() {
     setEditTx(null)
