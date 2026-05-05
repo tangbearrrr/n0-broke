@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTransactions, useDebts, useIncome } from "@/hooks/useQueries"
 import { formatBaht, cn } from "@/lib/utils"
@@ -39,6 +39,9 @@ export default function SummaryPage() {
   const { data: income,       isLoading: incomeLoading } = useIncome()
 
   const isLoading = txLoading || debtsLoading || incomeLoading
+
+  // ── Selected cycle filter (null = All) ─────────────────────────────────────
+  const [selectedCycle, setSelectedCycle] = useState<string | null>(null)
 
   // ── Fixed values ───────────────────────────────────────────────────────────
   const netIncome    = income?.find((r) => r.label === "Net Income")?.value ?? 0
@@ -87,6 +90,12 @@ export default function SummaryPage() {
     return "OTHER"
   }
 
+  // ── Filtered cycles (respects selectedCycle) ──────────────────────────────
+  const visibleCycles = useMemo(
+    () => selectedCycle ? cycles.filter((c) => c.key === selectedCycle) : cycles,
+    [cycles, selectedCycle],
+  )
+
   const combinedByType = useMemo(() => {
     const map: Record<TypeKey, { debtTotal: number; txTotal: number }> = {
       KTC:    { debtTotal: 0, txTotal: 0 },
@@ -101,24 +110,22 @@ export default function SummaryPage() {
       map[key].debtTotal += Number(d.monthly_payment)
     })
 
-    // Sum latest cycle transactions by type
-    if (cycles.length > 0) {
-      const latestCycleKey = cycles[0].key
-      transactions?.forEach((t) => {
-        const dateStr = toDateOnly(t.date)
-        const cycle   = dateStr ? dateToCycleStart(dateStr) : { year: 2000, month: 1 }
-        if (cycleKey(cycle) !== latestCycleKey) return
-        const key = normaliseType(t.type)
-        map[key].txTotal += Number(t.amount)
-      })
-    }
+    // Sum transactions for visible cycles by type
+    const visibleKeys = new Set(visibleCycles.map((c) => c.key))
+    transactions?.forEach((t) => {
+      const dateStr = toDateOnly(t.date)
+      const cycle   = dateStr ? dateToCycleStart(dateStr) : { year: 2000, month: 1 }
+      if (!visibleKeys.has(cycleKey(cycle))) return
+      const key = normaliseType(t.type)
+      map[key].txTotal += Number(t.amount)
+    })
 
     return TYPES.map((type) => ({
       type,
       ...map[type],
       total: map[type].debtTotal + map[type].txTotal,
     }))
-  }, [debts, transactions, cycles])
+  }, [debts, transactions, visibleCycles])
 
 
   if (isLoading) {
@@ -164,6 +171,37 @@ export default function SummaryPage() {
           highlight={afterDebts >= 0 ? "green" : "red"}
         />
       </div>
+
+      {/* ── Month filter pills ──────────────────────────────────────────── */}
+      {cycles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setSelectedCycle(null)}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+              selectedCycle === null
+                ? "bg-foreground text-background border-foreground"
+                : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground",
+            )}
+          >
+            All
+          </button>
+          {cycles.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setSelectedCycle(c.key === selectedCycle ? null : c.key)}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                selectedCycle === c.key
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground",
+              )}
+            >
+              {c.payMonth}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Combined debt + transaction by type ────────────────────────── */}
       {(() => {
@@ -224,12 +262,12 @@ export default function SummaryPage() {
 
       {/* ── Per-cycle breakdown ────────────────────────────────────────── */}
       <div className="space-y-3">
-        {cycles.length === 0 ? (
+        {visibleCycles.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-12">
             No transactions recorded yet.
           </p>
         ) : (
-          cycles.map((c) => (
+          visibleCycles.map((c) => (
             <Card key={c.key} className="overflow-hidden">
               {/* colour accent bar */}
               <div className={cn(
