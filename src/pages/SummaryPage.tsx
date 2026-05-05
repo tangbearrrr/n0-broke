@@ -90,9 +90,9 @@ export default function SummaryPage() {
     return "OTHER"
   }
 
-  // ── Filtered cycles (respects selectedCycle) ──────────────────────────────
+  // ── Filtered cycles (respects selectedCycle; null defaults to latest) ────────
   const visibleCycles = useMemo(
-    () => selectedCycle ? cycles.filter((c) => c.key === selectedCycle) : cycles,
+    () => selectedCycle ? cycles.filter((c) => c.key === selectedCycle) : cycles.slice(0, 1),
     [cycles, selectedCycle],
   )
 
