@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, RefreshCw } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +36,7 @@ type TxForm = {
   name: string
   amount: string
   type: "KTC" | "Shopee" | "Other"
+  isIncome: boolean
 }
 
 const EMPTY_FORM = (month: string): TxForm => ({
@@ -43,6 +45,7 @@ const EMPTY_FORM = (month: string): TxForm => ({
   name: "",
   amount: "",
   type: "KTC",
+  isIncome: false,
 })
 
 export default function MonthlyPage() {
@@ -98,17 +101,19 @@ export default function MonthlyPage() {
 
   function openEdit(tx: Transaction) {
     setEditTx(tx)
-    setForm({ month: tx.month, date: tx.date ?? "", name: tx.name, amount: String(tx.amount), type: tx.type })
+    const amt = Number(tx.amount)
+    setForm({ month: tx.month, date: tx.date ?? "", name: tx.name, amount: String(Math.abs(amt)), type: tx.type, isIncome: amt < 0 })
     setDialogOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const rawAmount = parseFloat(form.amount)
     const payload = {
       month: form.month,
       date: form.date || null,
       name: form.name,
-      amount: parseFloat(form.amount),
+      amount: form.isIncome ? -Math.abs(rawAmount) : Math.abs(rawAmount),
       type: form.type,
     }
     try {
@@ -261,7 +266,18 @@ export default function MonthlyPage() {
                             <TableCell className="text-muted-foreground">{tx.date ?? "—"}</TableCell>
                             <TableCell className="font-medium">{tx.name}</TableCell>
                             <TableCell><TypeBadge type={tx.type} /></TableCell>
-                            <TableCell className="text-right font-mono">{formatBaht(Number(tx.amount))}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              <span className={cn(
+                                "tabular-nums",
+                                Number(tx.amount) < 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-rose-600 dark:text-rose-400",
+                              )}>
+                                {Number(tx.amount) < 0
+                                  ? `+${formatBaht(Math.abs(Number(tx.amount)))}`
+                                  : `-${formatBaht(Number(tx.amount))}`}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 justify-end">
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(tx)}>
@@ -291,6 +307,34 @@ export default function MonthlyPage() {
             <DialogTitle>{editTx ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Expense / Prepayment toggle */}
+            <div className="grid grid-cols-2 rounded-lg border p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isIncome: false, name: "" }))}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  !form.isIncome
+                    ? "bg-rose-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                − Expense
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isIncome: true, name: "Prepayment" }))}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  form.isIncome
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                + Prepayment
+              </button>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="tx-month">Month</Label>
               <Input
@@ -309,6 +353,7 @@ export default function MonthlyPage() {
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
               />
             </div>
+            {!form.isIncome && (
             <div className="grid gap-2">
               <Label htmlFor="tx-name">Name</Label>
               <Input
@@ -319,6 +364,7 @@ export default function MonthlyPage() {
                 required
               />
             </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="tx-amount">Amount (฿)</Label>
               <Input

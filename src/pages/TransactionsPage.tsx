@@ -38,12 +38,28 @@ type TxForm = {
   name: string
   amount: string
   type: "KTC" | "Shopee" | "Other"
+  isIncome: boolean
 }
 
 type SortKey = "date" | "name" | "amount" | "type"
 type SortDir = "asc" | "desc"
 
-const EMPTY_FORM: TxForm = { month: "", date: "", name: "", amount: "", type: "KTC" }
+const EMPTY_FORM: TxForm = { month: "", date: "", name: "", amount: "", type: "KTC", isIncome: false }
+
+// ─── Amount display helper ────────────────────────────────────────────────────
+
+function AmountCell({ amount, className }: { amount: number; className?: string }) {
+  const isIncome = amount < 0
+  return (
+    <span className={cn(
+      "font-mono tabular-nums",
+      isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+      className,
+    )}>
+      {isIncome ? `+${formatBaht(Math.abs(amount))}` : `-${formatBaht(amount)}`}
+    </span>
+  )
+}
 
 // ─── SortHead ─────────────────────────────────────────────────────────────────
 
@@ -186,12 +202,14 @@ export default function TransactionsPage() {
 
   function openEdit(tx: Transaction) {
     setEditTx(tx)
+    const amt = Number(tx.amount)
     setForm({
-      month:  tx.month,
-      date:   toDateOnly(tx.date),
-      name:   tx.name,
-      amount: String(tx.amount),
-      type:   tx.type,
+      month:    tx.month,
+      date:     toDateOnly(tx.date),
+      name:     tx.name,
+      amount:   String(Math.abs(amt)),
+      type:     tx.type,
+      isIncome: amt < 0,
     })
     setDialogOpen(true)
   }
@@ -209,11 +227,12 @@ export default function TransactionsPage() {
     const month = editTx
       ? form.month                          // keep original month when editing
       : monthFromDate(form.date)            // derive from date when adding
+    const rawAmount = parseFloat(form.amount)
     const payload = {
       month,
       date:   form.date || null,
       name:   form.name,
-      amount: parseFloat(form.amount),
+      amount: form.isIncome ? -Math.abs(rawAmount) : Math.abs(rawAmount),
       type:   form.type,
     }
     try {
@@ -320,7 +339,9 @@ export default function TransactionsPage() {
                               <TableCell className="text-muted-foreground tabular-nums">{toDateOnly(tx.date) || "—"}</TableCell>
                               <TableCell className="font-medium">{tx.name}</TableCell>
                               <TableCell><TypeBadge type={tx.type} /></TableCell>
-                              <TableCell className="text-right font-mono tabular-nums">{formatBaht(Number(tx.amount))}</TableCell>
+                              <TableCell className="text-right">
+                                <AmountCell amount={Number(tx.amount)} />
+                              </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1 justify-end">
                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(tx)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -367,7 +388,7 @@ export default function TransactionsPage() {
                               <span className="text-xs text-muted-foreground tabular-nums">{toDateOnly(tx.date) || "—"}</span>
                             </div>
                           </div>
-                          <p className="font-mono font-semibold text-sm tabular-nums shrink-0">{formatBaht(Number(tx.amount))}</p>
+                          <AmountCell amount={Number(tx.amount)} className="font-semibold text-sm shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(tx)}><Pencil className="h-3.5 w-3.5" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(tx)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -418,6 +439,34 @@ export default function TransactionsPage() {
             <DialogTitle>{editTx ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Expense / Prepayment toggle */}
+            <div className="grid grid-cols-2 rounded-lg border p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isIncome: false, name: "" }))}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  !form.isIncome
+                    ? "bg-rose-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                − Expense
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isIncome: true, name: "Prepayment" }))}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  form.isIncome
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                + Prepayment
+              </button>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="tx-date">Date</Label>
               <Input
@@ -428,6 +477,7 @@ export default function TransactionsPage() {
                 required
               />
             </div>
+            {!form.isIncome && (
             <div className="grid gap-2">
               <Label htmlFor="tx-name">Name</Label>
               <Input
@@ -438,6 +488,7 @@ export default function TransactionsPage() {
                 required
               />
             </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="tx-amount">Amount (฿)</Label>
               <Input
@@ -486,7 +537,7 @@ export default function TransactionsPage() {
             <AlertDialogDescription>
               This will permanently remove{" "}
               <strong>{deleteTarget?.name}</strong>{" "}
-              ({formatBaht(Number(deleteTarget?.amount ?? 0))}). This cannot be undone.
+              ({formatBaht(Math.abs(Number(deleteTarget?.amount ?? 0)))}). This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
