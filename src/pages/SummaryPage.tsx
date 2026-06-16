@@ -40,7 +40,7 @@ export default function SummaryPage() {
 
   const isLoading = txLoading || debtsLoading || incomeLoading
 
-  // ── Selected cycle filter (null = All) ─────────────────────────────────────
+  // ── Selected cycle filter (null = latest) ─────────────────────────────────
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null)
 
   // ── Fixed values ───────────────────────────────────────────────────────────
@@ -90,10 +90,11 @@ export default function SummaryPage() {
     return "OTHER"
   }
 
-  // ── Filtered cycles (respects selectedCycle; null defaults to latest) ────────
+  const effectiveKey = selectedCycle ?? cycles[0]?.key ?? null
+
   const visibleCycles = useMemo(
-    () => selectedCycle ? cycles.filter((c) => c.key === selectedCycle) : cycles.slice(0, 1),
-    [cycles, selectedCycle],
+    () => effectiveKey ? cycles.filter((c) => c.key === effectiveKey) : [],
+    [cycles, effectiveKey],
   )
 
   const combinedByType = useMemo(() => {
@@ -172,27 +173,16 @@ export default function SummaryPage() {
         />
       </div>
 
-      {/* ── Month filter pills ──────────────────────────────────────────── */}
+      {/* ── Cycle filter pills ─────────────────────────────────────────── */}
       {cycles.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setSelectedCycle(null)}
-            className={cn(
-              "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-              selectedCycle === null
-                ? "bg-foreground text-background border-foreground"
-                : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground",
-            )}
-          >
-            All
-          </button>
           {cycles.map((c) => (
             <button
               key={c.key}
               onClick={() => setSelectedCycle(c.key === selectedCycle ? null : c.key)}
               className={cn(
                 "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-                selectedCycle === c.key
+                effectiveKey === c.key
                   ? "bg-foreground text-background border-foreground"
                   : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground",
               )}
