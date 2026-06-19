@@ -7,7 +7,10 @@
       "Bash(npm create vite@latest client -- --template react-ts)",
       "Bash(npx tailwindcss@3 init:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd per-month filter to Summary page\n\nAdds pill buttons to filter the Summary page by billing cycle. Selecting\na month narrows both the \"Total by Type\" card and the per-cycle breakdown\nto that cycle; debt totals are always included regardless of filter.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)"
     ]
   }
 }
