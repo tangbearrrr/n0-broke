@@ -130,15 +130,20 @@ export default function TransactionsPage() {
     )
 
     return entries.map(({ cycle, rows }) => {
-      const sorted = [...rows].sort((a, b) => {
-        let av: string | number = a[sortKey] ?? ""
-        let bv: string | number = b[sortKey] ?? ""
-        if (sortKey === "amount") { av = Number(av); bv = Number(bv) }
-        else { av = String(av).toLowerCase(); bv = String(bv).toLowerCase() }
-        if (av < bv) return sortDir === "asc" ? -1 : 1
-        if (av > bv) return sortDir === "asc" ? 1 : -1
-        return 0
-      })
+      // `transactions` arrives ordered by created_at ascending (see api.ts),
+      // so each row's index here doubles as its insertion order.
+      const sorted = rows
+        .map((row, insertOrder) => ({ row, insertOrder }))
+        .sort((a, b) => {
+          let av: string | number = a.row[sortKey] ?? ""
+          let bv: string | number = b.row[sortKey] ?? ""
+          if (sortKey === "amount") { av = Number(av); bv = Number(bv) }
+          else { av = String(av).toLowerCase(); bv = String(bv).toLowerCase() }
+          if (av < bv) return sortDir === "asc" ? -1 : 1
+          if (av > bv) return sortDir === "asc" ? 1 : -1
+          return b.insertOrder - a.insertOrder
+        })
+        .map(({ row }) => row)
 
       const total        = rows.reduce((s, t) => s + Number(t.amount), 0)
       const ktcTotal     = rows.filter((t) => t.type === "KTC").reduce((s, t) => s + Number(t.amount), 0)
