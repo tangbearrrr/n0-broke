@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase"
+
 // ─── Shared Types ────────────────────────────────────────────────────────────
 
 export interface Transaction {
@@ -27,80 +29,101 @@ export interface Note {
   note: string
 }
 
-// ─── Transport ────────────────────────────────────────────────────────────────
-//
-// Google Apps Script Web Apps do NOT support CORS preflight (OPTIONS).
-// Any fetch() with Content-Type: application/json triggers a preflight → blocked.
-//
-// Solution: route EVERYTHING through GET.
-//   • Reads  → plain query params  (?action=listDebts&month=SEP)
-//   • Writes → payload serialised as a single "payload" query param
-//              (?action=addDebt&payload={"debt_name":"..."})
-//
-// GAS follows redirects automatically, so the deployed URL always works.
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const BASE = import.meta.env.VITE_API_URL as string
-
-/** Build a full URL with query params and fetch it (no preflight). */
-async function gs<T>(params: Record<string, string>): Promise<T> {
-  const url = new URL(BASE)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json()
-  if (!json.ok) throw new Error(json.error ?? "Unknown error")
-  return json.data as T
-}
-
-/**
- * Mutation helper — still a GET, but serialises the body as a
- * single "payload" query-param so no preflight is triggered.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function gsMut<T>(action: string, body: any): Promise<T> {
-  return gs<T>({ action, payload: JSON.stringify(body) })
+function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
+  if (error) throw new Error(error.message)
+  return data as T
 }
 
 // ─── API surface ──────────────────────────────────────────────────────────────
+//
+// Backed by Supabase (Postgres). Auth is still handled entirely by Firebase
+// (see src/hooks/useAuth.ts) — this client uses the public anon key, and
+// table access is governed by permissive RLS policies (see supabase/schema.sql).
 
 export const api = {
   // ── Reads ──────────────────────────────────────────────────────────────────
-  listTransactions: () =>
-    gs<Transaction[]>({ action: "listTransactions" }),
+  listTransactions: async (): Promise<Transaction[]> =>
+    unwrap(
+      await supabase
+        .from("transactions")
+        .select("id, month, date, name, amount, type")
+        .order("created_at", { ascending: true }),
+    ),
 
-  listByMonth: (month: string) =>
-    gs<Transaction[]>({ action: "listByMonth", month }),
+  listByMonth: async (month: string): Promise<Transaction[]> =>
+    unwrap(
+      await supabase
+        .from("transactions")
+        .select("id, month, date, name, amount, type")
+        .eq("month", month)
+        .order("created_at", { ascending: true }),
+    ),
 
-  listDebts: () =>
-    gs<Debt[]>({ action: "listDebts" }),
+  listDebts: async (): Promise<Debt[]> =>
+    unwrap(
+      await supabase
+        .from("debts")
+        .select("id, debt_name, monthly_payment, remaining, type")
+        .order("created_at", { ascending: true }),
+    ),
 
-  getIncome: () =>
-    gs<IncomeRow[]>({ action: "getIncome" }),
+  getIncome: async (): Promise<IncomeRow[]> =>
+    unwrap(await supabase.from("income").select("label, value")),
 
-  getNote: (month: string) =>
-    gs<Note | null>({ action: "getNote", month }),
+  getNote: async (month: string): Promise<Note | null> =>
+    unwrap(
+      await supabase.from("notes").select("month, note").eq("month", month).maybeSingle(),
+    ),
 
-  listMonths: () => gs<string[]>({ action: "listMonths" }),
+  listMonths: async (): Promise<string[]> => {
+    const rows = unwrap<{ month: string }[]>(
+      await supabase
+        .from("transactions")
+        .select("month")
+        .order("created_at", { ascending: true }),
+    )
+    const seen = new Set<string>()
+    const months: string[] = []
+    for (const { month } of rows) {
+      if (month && !seen.has(month)) {
+        seen.add(month)
+        months.push(month)
+      }
+    }
+    return months
+  },
 
-  // ── Writes (all go as GET + payload param) ─────────────────────────────────
-  addTransaction: (data: Omit<Transaction, "id">) =>
-    gsMut<Transaction>("addTransaction", data),
+  // ── Writes ───────────────────────────────────────────────────────────────
+  addTransaction: async (data: Omit<Transaction, "id">): Promise<Transaction> =>
+    unwrap(await supabase.from("transactions").insert(data).select().single()),
 
-  updateTransaction: (data: Transaction) =>
-    gsMut<Transaction>("updateTransaction", data),
+  updateTransaction: async ({ id, ...rest }: Transaction): Promise<Transaction> =>
+    unwrap(await supabase.from("transactions").update(rest).eq("id", id).select().single()),
 
-  deleteTransaction: (id: string) =>
-    gsMut<void>("deleteTransaction", { id }),
+  deleteTransaction: async (id: string): Promise<void> => {
+    const { error } = await supabase.from("transactions").delete().eq("id", id)
+    if (error) throw new Error(error.message)
+  },
 
-  addDebt: (data: Omit<Debt, "id">) =>
-    gsMut<Debt>("addDebt", data),
+  addDebt: async (data: Omit<Debt, "id">): Promise<Debt> =>
+    unwrap(await supabase.from("debts").insert(data).select().single()),
 
-  updateDebt: (data: Debt) =>
-    gsMut<Debt>("updateDebt", data),
+  updateDebt: async ({ id, ...rest }: Debt): Promise<Debt> =>
+    unwrap(await supabase.from("debts").update(rest).eq("id", id).select().single()),
 
-  deleteDebt: (id: string) =>
-    gsMut<void>("deleteDebt", { id }),
+  deleteDebt: async (id: string): Promise<void> => {
+    const { error } = await supabase.from("debts").delete().eq("id", id)
+    if (error) throw new Error(error.message)
+  },
 
-  saveNote: (month: string, note: string) =>
-    gsMut<Note>("saveNote", { month, note }),
+  saveNote: async (month: string, note: string): Promise<Note> =>
+    unwrap(
+      await supabase
+        .from("notes")
+        .upsert({ month, note }, { onConflict: "month" })
+        .select()
+        .single(),
+    ),
 }
