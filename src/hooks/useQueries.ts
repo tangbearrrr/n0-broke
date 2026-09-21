@@ -81,6 +81,14 @@ export function useDeleteDebt() {
   })
 }
 
+export function useSetDebtDisabled() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.setDebtDisabled,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["debts"] }),
+  })
+}
+
 // ─── Income ──────────────────────────────────────────────────────────────────
 
 export function useIncome() {

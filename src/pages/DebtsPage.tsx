@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Pencil, Trash2, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, X, ChevronLeft, ChevronRight, Ban } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/table"
 import { TableSkeleton } from "@/components/Skeletons"
 import { TypeCombobox } from "@/components/TypeCombobox"
-import { useDebts, useAddDebt, useUpdateDebt, useDeleteDebt } from "@/hooks/useQueries"
+import { useDebts, useAddDebt, useUpdateDebt, useDeleteDebt, useSetDebtDisabled } from "@/hooks/useQueries"
 import { formatBaht, cn } from "@/lib/utils"
 import type { Debt } from "@/lib/api"
 
-type DebtForm = Omit<Debt, "id">
+type DebtForm = Omit<Debt, "id" | "disabled">
 type SortKey  = "debt_name" | "type" | "monthly_payment" | "remaining"
 type SortDir  = "asc" | "desc"
 
@@ -133,6 +133,7 @@ export default function DebtsPage() {
   const { mutateAsync: addDebt,    isPending: adding   } = useAddDebt()
   const { mutateAsync: updateDebt, isPending: updating } = useUpdateDebt()
   const { mutateAsync: deleteDebt, isPending: deleting } = useDeleteDebt()
+  const { mutateAsync: setDebtDisabled } = useSetDebtDisabled()
 
   const [dialogOpen,   setDialogOpen]   = useState(false)
   const [editDebt,     setEditDebt]     = useState<Debt | null>(null)
@@ -145,12 +146,16 @@ export default function DebtsPage() {
   const PAGE_SIZE = 10
 
   // ── derived ──────────────────────────────────────────────────────────────
-  const totalMonthly = debts?.reduce((s, d) => s + Number(d.monthly_payment), 0) ?? 0
+  // Disabled debts are excluded from the totals below for quick "what if" math.
+  const activeDebts = useMemo(
+    () => debts?.filter((d) => !d.disabled) ?? [],
+    [debts]
+  )
+  const totalMonthly = activeDebts.reduce((s, d) => s + Number(d.monthly_payment), 0)
 
   const byType = useMemo(() => {
-    if (!debts) return []
     const map: Record<string, { total: number; count: number }> = {}
-    debts.forEach((d) => {
+    activeDebts.forEach((d) => {
       const t = d.type || "—"
       if (!map[t]) map[t] = { total: 0, count: 0 }
       map[t].total += Number(d.monthly_payment)
@@ -159,7 +164,7 @@ export default function DebtsPage() {
     return Object.entries(map)
       .map(([type, v]) => ({ type, ...v }))
       .sort((a, b) => b.total - a.total)
-  }, [debts])
+  }, [activeDebts])
 
   const displayedDebts = useMemo(() => {
     if (!debts) return []
@@ -186,6 +191,11 @@ export default function DebtsPage() {
     setPage(1)
   }
 
+  async function toggleDisabled(d: Debt) {
+    try { await setDebtDisabled({ id: d.id, disabled: !d.disabled }) }
+    catch (err) { toast.error(String(err)) }
+  }
+
   function openAdd()    { setEditDebt(null); setForm(EMPTY_FORM); setDialogOpen(true) }
   function openEdit(d: Debt) {
     setEditDebt(d)
@@ -196,8 +206,8 @@ export default function DebtsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      if (editDebt) { await updateDebt({ ...form, id: editDebt.id }); toast.success("Debt updated") }
-      else          { await addDebt(form);                             toast.success("Debt added")   }
+      if (editDebt) { await updateDebt({ ...form, id: editDebt.id, disabled: editDebt.disabled }); toast.success("Debt updated") }
+      else          { await addDebt({ ...form, disabled: false });                                  toast.success("Debt added")   }
       setDialogOpen(false)
     } catch (err) { toast.error(String(err)) }
   }
@@ -326,7 +336,7 @@ export default function DebtsPage() {
                       <SortHead label="Type"            sortKey="type"            current={sortKey} dir={sortDir} onSort={handleSort} />
                       <SortHead label="Monthly Payment" sortKey="monthly_payment" current={sortKey} dir={sortDir} onSort={handleSort} className="text-right" />
                       <SortHead label="Remaining"       sortKey="remaining"       current={sortKey} dir={sortDir} onSort={handleSort} />
-                      <TableHead className="w-[80px]" />
+                      <TableHead className="w-[110px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -338,9 +348,10 @@ export default function DebtsPage() {
                       </TableRow>
                     ) : pagedDebts.map((d) => {
                       const c = getColor(d.type)
+                      const isDisabled = d.disabled
                       return (
-                        <TableRow key={d.id}>
-                          <TableCell className="font-medium">{d.debt_name}</TableCell>
+                        <TableRow key={d.id} className={cn(isDisabled && "opacity-50")}>
+                          <TableCell className={cn("font-medium", isDisabled && "line-through")}>{d.debt_name}</TableCell>
                           <TableCell>
                             <button onClick={() => { setActiveType(activeType === d.type ? null : d.type); setPage(1) }} className={cn("text-xs font-semibold px-2 py-0.5 rounded-full transition-opacity hover:opacity-75", c.badge)}>{d.type}</button>
                           </TableCell>
@@ -348,6 +359,14 @@ export default function DebtsPage() {
                           <TableCell className="min-w-[140px]"><RemainingCell value={d.remaining} /></TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
+                              <Button
+                                variant="ghost" size="icon"
+                                className={cn("h-8 w-8", isDisabled && "text-amber-600 hover:text-amber-600")}
+                                title={isDisabled ? "Include in total" : "Exclude from total"}
+                                onClick={() => toggleDisabled(d)}
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}><Pencil className="h-3.5 w-3.5" /></Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(d)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
@@ -367,10 +386,11 @@ export default function DebtsPage() {
                   </p>
                 ) : pagedDebts.map((d) => {
                   const c = getColor(d.type)
+                  const isDisabled = d.disabled
                   return (
-                    <div key={d.id} className="flex items-center px-4 py-3 border-b last:border-b-0 gap-3">
+                    <div key={d.id} className={cn("flex items-center px-4 py-3 border-b last:border-b-0 gap-3", isDisabled && "opacity-50")}>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{d.debt_name}</p>
+                        <p className={cn("font-medium text-sm truncate", isDisabled && "line-through")}>{d.debt_name}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <button onClick={() => { setActiveType(activeType === d.type ? null : d.type); setPage(1) }} className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full", c.badge)}>{d.type}</button>
                           <span className="text-xs text-muted-foreground"><RemainingCell value={d.remaining} /></span>
@@ -378,6 +398,14 @@ export default function DebtsPage() {
                       </div>
                       <p className="font-mono font-semibold text-sm tabular-nums shrink-0">{formatBaht(Number(d.monthly_payment))}</p>
                       <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost" size="icon"
+                          className={cn("h-8 w-8", isDisabled && "text-amber-600 hover:text-amber-600")}
+                          title={isDisabled ? "Include in total" : "Exclude from total"}
+                          onClick={() => toggleDisabled(d)}
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}><Pencil className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(d)}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>

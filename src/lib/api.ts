@@ -22,6 +22,7 @@ export interface Debt {
   monthly_payment: number
   remaining: string
   type: string
+  disabled: boolean
 }
 
 export interface Note {
@@ -65,7 +66,7 @@ export const api = {
     unwrap(
       await supabase
         .from("debts")
-        .select("id, debt_name, monthly_payment, remaining, type")
+        .select("id, debt_name, monthly_payment, remaining, type, disabled")
         .order("created_at", { ascending: true }),
     ),
 
@@ -117,6 +118,9 @@ export const api = {
     const { error } = await supabase.from("debts").delete().eq("id", id)
     if (error) throw new Error(error.message)
   },
+
+  setDebtDisabled: async ({ id, disabled }: { id: string; disabled: boolean }): Promise<Debt> =>
+    unwrap(await supabase.from("debts").update({ disabled }).eq("id", id).select().single()),
 
   saveNote: async (month: string, note: string): Promise<Note> =>
     unwrap(

@@ -31,8 +31,11 @@ create table if not exists debts (
   monthly_payment numeric not null,
   remaining text not null default '-',
   type text not null default '',
+  disabled boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table debts add column if not exists disabled boolean not null default false;
 
 alter table debts enable row level security;
 create policy "allow all - debts" on debts for all using (true) with check (true);

@@ -45,7 +45,8 @@ export default function SummaryPage() {
 
   // ── Fixed values ───────────────────────────────────────────────────────────
   const netIncome    = income?.find((r) => r.label === "Net Income")?.value ?? 0
-  const totalDebts   = debts?.reduce((s, d) => s + Number(d.monthly_payment), 0) ?? 0
+  const activeDebts  = useMemo(() => debts?.filter((d) => !d.disabled) ?? [], [debts])
+  const totalDebts   = activeDebts.reduce((s, d) => s + Number(d.monthly_payment), 0)
   const afterDebts   = netIncome - totalDebts
 
   // ── Build per-cycle summaries ──────────────────────────────────────────────
@@ -105,7 +106,7 @@ export default function SummaryPage() {
     }
 
     // Sum debt monthly payments by type (exclude OTHER)
-    debts?.forEach((d) => {
+    activeDebts.forEach((d) => {
       const key = normaliseType(d.type || "Other")
       if (key === "OTHER") return
       map[key].debtTotal += Number(d.monthly_payment)
@@ -126,7 +127,7 @@ export default function SummaryPage() {
       ...map[type],
       total: map[type].debtTotal + map[type].txTotal,
     }))
-  }, [debts, transactions, visibleCycles])
+  }, [activeDebts, transactions, visibleCycles])
 
 
   if (isLoading) {
@@ -162,7 +163,7 @@ export default function SummaryPage() {
         <StatCard
           label="Debts"
           value={formatBaht(totalDebts)}
-          sub={`${debts?.length ?? 0} obligations`}
+          sub={`${activeDebts.length} obligations`}
           highlight="red"
         />
         <StatCard
